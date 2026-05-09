@@ -1,0 +1,52 @@
+name: story_parse
+description: A language learning app for studying texts and building vocabulary.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State management
+  provider: ^6.1.1
+
+  # Database
+  sqflite: ^2.3.0
+  sqflite_common_ffi: ^2.3.0   # For desktop (Windows/Linux/macOS)
+  path: ^1.8.3
+  path_provider: ^2.1.1
+
+  # File picking
+  file_picker: ^6.1.1
+
+  # HTTP for downloading web pages
+  http: ^1.1.0
+
+  # HTML parsing for web URLs
+  html: ^0.15.4
+
+  # CSV parsing
+  csv: ^5.1.1
+
+  # Shared preferences for settings
+  shared_preferences: ^2.2.2
+
+  # UI extras
+  cupertino_icons: ^1.0.6
+  google_fonts: ^6.1.0
+  flip_card: ^0.7.0
+  lottie: ^2.7.0
+  url_launcher: ^6.2.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1
+
+flutter:
+  uses-material-design: true
+#  assets:
+#    - assets/
