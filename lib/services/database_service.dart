@@ -155,7 +155,55 @@ class DatabaseService {
         'position'       : i,
       });
     }
+
+    // Extract every unique word from the full content and upsert into word_entries.
+    // Words with no existing definition are inserted as "unlearned" placeholders
+    // so they show up coloured in the reader immediately.
+    await _extractAndStoreWords(db, text.languageId, text.content);
+
     return id;
+  }
+
+  /// Tokenise [content] into distinct words and insert any that don't already
+  /// exist in word_entries for [languageId].  Uses INSERT OR IGNORE so existing
+  /// entries (with definitions / learned state) are never overwritten.
+  Future<void> _extractAndStoreWords(
+      Database db, int languageId, String content) async {
+    // Split on anything that is not a letter, digit, apostrophe, hyphen,
+    // or CJK / kana / hangul / Arabic / Cyrillic character.
+    // The broad Unicode range covers Japanese, Chinese, Korean, Arabic, etc.
+    final tokenPattern = RegExp(
+      r"[^\w\u00C0-\u024F"         // Latin extended (accented chars)
+      r"\u0400-\u04FF"             // Cyrillic
+      r"\u0600-\u06FF"             // Arabic
+      r"\u3000-\u303F"             // CJK punctuation (kept as delimiters)
+      r"\u3040-\u309F"             // Hiragana
+      r"\u30A0-\u30FF"             // Katakana
+      r"\u4E00-\u9FFF"             // CJK Unified Ideographs
+      r"\uAC00-\uD7AF"             // Hangul syllables
+      r"'-]+"                      // apostrophe / hyphen allowed inside words
+    );
+
+    final now = DateTime.now().toIso8601String();
+    final seen = <String>{};
+
+    final tokens = content
+        .split(tokenPattern)
+        .map((t) => t.trim().toLowerCase())
+        .where((t) => t.length > 1)          // skip single chars / punctuation
+        .where((t) => !RegExp(r'^\d+$').hasMatch(t)); // skip pure numbers
+
+    for (final word in tokens) {
+      if (seen.contains(word)) continue;
+      seen.add(word);
+      // INSERT OR IGNORE — never overwrite an existing entry.
+      await db.rawInsert('''
+        INSERT OR IGNORE INTO word_entries
+          (language_id, word, reading, definition, learned,
+           times_seen, times_correct, created_at)
+        VALUES (?, ?, NULL, NULL, 0, 0, 0, ?)
+      ''', [languageId, word, now]);
+    }
   }
 
   Future<void> deleteStudyText(int id) async {
@@ -163,12 +211,37 @@ class DatabaseService {
     await db.delete('study_texts', where: 'id = ?', whereArgs: [id]);
   }
 
+  /// Split [content] into paragraphs.
+  ///
+  /// Priority order:
+  ///  1. Double-newline (blank line) separated — the standard paragraph break.
+  ///  2. Single-newline separated — common in plain .txt exports.
+  ///  3. Fallback: treat the whole content as one paragraph.
   List<String> _splitParagraphs(String content) {
-    return content
+    // Normalise Windows line endings.
+    final normalised = content.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+
+    // Try double-newline split first.
+    var paras = normalised
         .split(RegExp(r'\n\s*\n'))
         .map((p) => p.trim())
         .where((p) => p.isNotEmpty)
         .toList();
+
+    if (paras.length > 1) return paras;
+
+    // Fall back to single-newline split.
+    paras = normalised
+        .split('\n')
+        .map((p) => p.trim())
+        .where((p) => p.isNotEmpty)
+        .toList();
+
+    if (paras.length > 1) return paras;
+
+    // Last resort: one big paragraph.
+    final trimmed = normalised.trim();
+    return trimmed.isEmpty ? [] : [trimmed];
   }
 
   // ── Paragraphs ─────────────────────────────────────────────

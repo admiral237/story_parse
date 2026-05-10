@@ -37,6 +37,11 @@ class _VocabularyScreenState extends State<VocabularyScreen>
         final lang = provider.selectedLanguage;
         return Scaffold(
           appBar: AppBar(
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              tooltip: 'Back',
+              onPressed: () => Navigator.of(context).pop(),
+            ),
             title: Text('${lang?.name ?? ''} Vocabulary'),
             bottom: TabBar(
               controller: _tabCtrl,

@@ -19,6 +19,11 @@ class TextsScreen extends StatelessWidget {
         final lang = provider.selectedLanguage;
         return Scaffold(
           appBar: AppBar(
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              tooltip: 'Back to languages',
+              onPressed: () => Navigator.of(context).pop(),
+            ),
             title: Text('${lang?.flagEmoji ?? ''} ${lang?.name ?? ''} — Texts'),
             actions: [
               IconButton(

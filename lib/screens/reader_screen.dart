@@ -21,14 +21,19 @@ class _ReaderScreenState extends State<ReaderScreen> {
   Widget build(BuildContext context) {
     return Consumer<AppProvider>(
       builder: (context, provider, _) {
-        final text = provider.selectedText;
-        final paras = provider.paragraphs;
-        final idx = provider.selectedParagraphIndex;
+        final text        = provider.selectedText;
+        final paras       = provider.paragraphs;
+        final idx         = provider.selectedParagraphIndex;
         final currentPara = provider.currentParagraph;
-        final hasEnglish = text?.englishContent != null;
+        final hasEnglish  = text?.englishContent != null;
 
         return Scaffold(
           appBar: AppBar(
+            leading: IconButton(
+              icon     : const Icon(Icons.arrow_back),
+              tooltip  : 'Back to texts',
+              onPressed: () => Navigator.of(context).pop(),
+            ),
             title: Text(text?.title ?? 'Reader',
               overflow: TextOverflow.ellipsis,
             ),
@@ -38,13 +43,13 @@ class _ReaderScreenState extends State<ReaderScreen> {
                   icon: Icon(_showTranslation
                       ? Icons.translate
                       : Icons.translate_outlined),
-                  tooltip: 'Toggle translation',
+                  tooltip  : 'Toggle translation',
                   onPressed: () => setState(() => _showTranslation = !_showTranslation),
                 ),
               IconButton(
-                icon: const Icon(Icons.style_outlined),
-                tooltip: 'Flashcards for this paragraph',
-                onPressed: currentPara == null ? null : () => _launchParaFlashcards(context, provider, currentPara),
+                icon     : const Icon(Icons.style_outlined),
+                tooltip  : 'Flashcards for this paragraph',
+                onPressed: currentPara == null ? null      : () => _launchParaFlashcards(context, provider, currentPara),
               ),
             ],
           ),
@@ -79,19 +84,19 @@ class _ReaderScreenState extends State<ReaderScreen> {
           return GestureDetector(
             onTap: () => provider.selectParagraph(i),
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
-              padding: const EdgeInsets.symmetric(horizontal: 14),
+              duration  : const Duration(milliseconds: 200),
+              margin    : const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+              padding   : const EdgeInsets.symmetric(horizontal: 14),
               decoration: BoxDecoration(
-                color: selected ? AppTheme.accent : AppTheme.surfaceLight,
+                color       : selected ? AppTheme.accent: AppTheme.surfaceLight,
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Center(
                 child: Text('${i + 1}',
                   style: TextStyle(
-                    color: selected ? Colors.white : AppTheme.textSecondary,
-                    fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-                    fontSize: 14,
+                    color     : selected ? Colors.white   : AppTheme.textSecondary,
+                    fontWeight: selected ? FontWeight.bold: FontWeight.normal,
+                    fontSize  : 14,
                   ),
                 ),
               ),
@@ -104,9 +109,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   Widget _buildParagraphView(BuildContext context, AppProvider provider,
       Map<String, dynamic> para, bool hasEnglish) {
-    final targetText = para['content'] as String;
+    final targetText  = para['content'] as String;
     final englishText = para['english_content'] as String?;
-    final showEN = hasEnglish && _showTranslation && englishText != null;
+    final showEN      = hasEnglish && _showTranslation && englishText != null;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -120,9 +125,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppTheme.surface,
+                color       : AppTheme.surface,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.divider),
+                border      : Border.all(color: AppTheme.divider),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -155,154 +160,219 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   Widget _buildTappableText(BuildContext context, AppProvider provider, String text) {
-    // Tokenize by whitespace and punctuation, preserving spacing
-    final words = text.split(RegExp(r'(?<=\s)|(?=\s)'));
-    return Wrap(
-      children: words.map((token) {
-        final clean = token.replaceAll(RegExp(r'[^\w\u3000-\u9fff\u4e00-\u9fff]'), '');
-        if (clean.isEmpty || token.trim().isEmpty) {
-          return Text(token, style: GoogleFonts.notoSans(
+    // Build a fast lookup set (lower-case) for O(1) membership tests.
+    final learnedSet = <String>{};
+    final trackedSet = <String>{};
+    for (final w in provider.words) {
+      trackedSet.add(w.word.toLowerCase());
+      if (w.learned) learnedSet.add(w.word.toLowerCase());
+    }
+
+    // Tokenise into alternating [word, non-word, word, …] spans so we can
+    // render every character without losing spaces / punctuation.
+    // The pattern matches a "word" — one or more letters/digits/apostrophe/
+    // hyphen, including accented Latin, Cyrillic, Arabic, CJK, Kana, Hangul.
+    final wordPattern = RegExp(
+      r"[\w\u00C0-\u024F\u0400-\u04FF\u0600-\u06FF"
+      r"\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\uAC00-\uD7AF'-]+",
+    );
+
+    final spans = <InlineSpan>[];
+    int cursor = 0;
+
+    for (final match in wordPattern.allMatches(text)) {
+      // Non-word gap before this match (spaces, punctuation, newlines…)
+      if (match.start > cursor) {
+        spans.add(TextSpan(
+          text: text.substring(cursor, match.start),
+          style: GoogleFonts.notoSans(
             fontSize: 18, color: AppTheme.textPrimary, height: 1.8,
-          ));
-        }
-        final isSelected = _selectedWord == clean;
-        final learned = provider.words.any((w) =>
-          w.word.toLowerCase() == clean.toLowerCase() && w.learned);
-        final tracked = provider.words.any((w) =>
-          w.word.toLowerCase() == clean.toLowerCase());
-        return GestureDetector(
+          ),
+        ));
+      }
+
+      final token      = match.group(0)!;
+      final key        = token.toLowerCase();
+      final isSelected = _selectedWord == key;
+      final isLearned  = learnedSet.contains(key);
+      final isTracked  = trackedSet.contains(key);
+
+      final bgColor = isSelected
+          ? AppTheme.accent.withOpacity(0.3)
+          : isLearned
+              ? AppTheme.success.withOpacity(0.15)
+              : isTracked
+                  ? AppTheme.warning.withOpacity(0.15)
+                  : null;
+
+      final fgColor = isSelected
+          ? AppTheme.accentLight
+          : isLearned
+              ? AppTheme.success
+              : AppTheme.textPrimary;
+
+      spans.add(WidgetSpan(
+        alignment: PlaceholderAlignment.baseline,
+        baseline : TextBaseline.alphabetic,
+        child    : GestureDetector(
           onTap: () => setState(() {
-            _selectedWord = isSelected ? null : clean;
+            _selectedWord = isSelected ? null : key;
           }),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 1),
-            decoration: BoxDecoration(
-              color: isSelected
-                  ? AppTheme.accent.withOpacity(0.3)
-                  : learned
-                      ? AppTheme.success.withOpacity(0.15)
-                      : tracked
-                          ? AppTheme.warning.withOpacity(0.15)
-                          : Colors.transparent,
-              borderRadius: BorderRadius.circular(4),
-              border: isSelected ? Border.all(color: AppTheme.accent, width: 1.5) : null,
+            decoration: bgColor != null
+                ? BoxDecoration(
+                    color: bgColor,
+                    borderRadius: BorderRadius.circular(4),
+                    border: isSelected
+                        ? Border.all(color: AppTheme.accent, width: 1.5)
+                        : null,
+                  )
+                : null,
+            child: Text(
+              token,
+              style: GoogleFonts.notoSans(
+                fontSize  : 18,
+                color     : fgColor,
+                height    : 1.8,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+              ),
             ),
-            child: Text(token, style: GoogleFonts.notoSans(
-              fontSize: 18,
-              color: isSelected
-                  ? AppTheme.accentLight
-                  : learned
-                      ? AppTheme.success
-                      : AppTheme.textPrimary,
-              height: 1.8,
-              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-            )),
           ),
-        );
-      }).toList(),
+        ),
+      ));
+
+      cursor = match.end;
+    }
+
+    // Any trailing non-word text after the last match.
+    if (cursor < text.length) {
+      spans.add(TextSpan(
+        text: text.substring(cursor),
+        style: GoogleFonts.notoSans(
+          fontSize: 18, color: AppTheme.textPrimary, height: 1.8,
+        ),
+      ));
+    }
+
+    return Text.rich(
+      TextSpan(children: spans),
+      textAlign: TextAlign.left,
     );
   }
 
   Widget _buildWordPanel(BuildContext context, AppProvider provider, String word) {
+    // Words are auto-extracted on import, so they will almost always be in the DB.
     final existing = provider.words.firstWhere(
       (w) => w.word.toLowerCase() == word.toLowerCase(),
       orElse: () => WordEntry(languageId: -1, word: word),
     );
     final isTracked = existing.languageId != -1;
 
-    final readingCtrl = TextEditingController(text: existing.reading ?? '');
-    final defCtrl = TextEditingController(text: existing.definition ?? '');
+    // Use StatefulBuilder so the controllers don't rebuild on every parent setState.
+    return StatefulBuilder(
+      builder: (ctx, setInner) {
+        final readingCtrl = TextEditingController(text: existing.reading ?? '');
+        final defCtrl = TextEditingController(text: existing.definition ?? '');
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppTheme.cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.accent.withOpacity(0.4)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color       : AppTheme.cardBg,
+            borderRadius: BorderRadius.circular(16),
+            border      : Border.all(color: AppTheme.accent.withOpacity(0.4)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(child: Text(word,
-                style: Theme.of(context).textTheme.headlineMedium,
-              )),
-              if (isTracked)
-                Chip(
-                  label: Text(existing.learned ? '✓ Learned' : '📚 Studying'),
-                  backgroundColor: existing.learned
-                      ? AppTheme.success.withOpacity(0.2)
-                      : AppTheme.warning.withOpacity(0.2),
-                ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: readingCtrl,
-            decoration: const InputDecoration(
-              labelText: 'Reading / Pronunciation',
-              hintText: 'e.g. furigana, IPA...',
-              isDense: true,
-            ),
-          ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: defCtrl,
-            maxLines: 2,
-            decoration: const InputDecoration(
-              labelText: 'Definition / Translation',
-              hintText: 'Add your notes...',
-              isDense: true,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(children: [
-            Expanded(child: ElevatedButton(
-              onPressed: () async {
-                await provider.addWord(
-                  word: word,
-                  reading: readingCtrl.text.trim().isEmpty ? null : readingCtrl.text.trim(),
-                  definition: defCtrl.text.trim().isEmpty ? null : defCtrl.text.trim(),
-                );
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('"$word" added to vocabulary')),
-                );
-              },
-              child: Text(isTracked ? 'Update' : 'Track Word'),
-            )),
-            if (isTracked) ...[
-              const SizedBox(width: 10),
-              OutlinedButton(
-                onPressed: () => provider.markWordLearned(existing, !existing.learned),
-                child: Text(existing.learned ? 'Unlearn' : 'Mark Learned'),
+              Row(
+                children: [
+                  Expanded(child: Text(word,
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  )),
+                  if (isTracked)
+                    Chip(
+                      label: Text(existing.learned ? '✓ Learned' : '📚 Studying'),
+                      backgroundColor: existing.learned
+                          ? AppTheme.success.withOpacity(0.2)
+                          : AppTheme.warning.withOpacity(0.2),
+                    ),
+                ],
               ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: readingCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Reading / Pronunciation',
+                  hintText : 'e.g. furigana, IPA...',
+                  isDense  : true,
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: defCtrl,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'Definition / Translation',
+                  hintText : 'Add your notes...',
+                  isDense  : true,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(children: [
+                Expanded(child: ElevatedButton(
+                  onPressed: () async {
+                    await provider.addWord(
+                      word      : word.toLowerCase(),
+                      reading   : readingCtrl.text.trim().isEmpty ? null: readingCtrl.text.trim(),
+                      definition: defCtrl.text.trim().isEmpty ? null    : defCtrl.text.trim(),
+                    );
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('"$word" saved')),
+                      );
+                      setState(() {}); // refresh colour in text
+                    }
+                  },
+                  child: Text(isTracked ? 'Save Notes' : 'Track Word'),
+                )),
+                if (isTracked) ...[
+                  const SizedBox(width: 10),
+                  OutlinedButton(
+                    onPressed: () async {
+                      await provider.markWordLearned(existing, !existing.learned);
+                      if (mounted) setState(() {});
+                    },
+                    child: Text(existing.learned ? 'Unlearn' : 'Mark Learned'),
+                  ),
+                ],
+              ]),
             ],
-          ]),
-        ],
-      ),
+          ),
+        );
+      },
     );
   }
 
   Widget _buildNavBar(BuildContext context, AppProvider provider, int idx, int total) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      padding   : const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       decoration: const BoxDecoration(
-        color: AppTheme.cardBg,
+        color : AppTheme.cardBg,
         border: Border(top: BorderSide(color: AppTheme.divider)),
       ),
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.arrow_back_ios),
-            onPressed: idx > 0 ? () => provider.selectParagraph(idx - 1) : null,
+            icon     : const Icon(Icons.arrow_back_ios),
+            onPressed: idx > 0 ? () => provider.selectParagraph(idx - 1): null,
           ),
           Expanded(child: Center(child: Text(
             'Paragraph ${idx + 1} of $total',
             style: Theme.of(context).textTheme.bodyMedium,
           ))),
           IconButton(
-            icon: const Icon(Icons.arrow_forward_ios),
+            icon     : const Icon(Icons.arrow_forward_ios),
             onPressed: idx < total - 1 ? () => provider.selectParagraph(idx + 1) : null,
           ),
         ],

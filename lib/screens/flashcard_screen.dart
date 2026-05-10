@@ -36,6 +36,11 @@ class _FlashcardScreenState extends State<FlashcardScreen>
 
         return Scaffold(
           appBar: AppBar(
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              tooltip: 'Back',
+              onPressed: () => Navigator.of(context).pop(),
+            ),
             title: const Text('Flashcards'),
             actions: [
               Center(
@@ -247,7 +252,14 @@ class _FlashcardScreenState extends State<FlashcardScreen>
 
   Widget _buildDone(BuildContext context, AppProvider provider) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Flashcards')),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          tooltip: 'Back',
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: const Text('Flashcards'),
+      ),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
