@@ -26,8 +26,8 @@ class ImportResult {
 class TextImportService {
   /// Pick and parse a .txt file. Returns content as plain text.
   Future<ImportResult?> importTxt() async {
-    final result = await FilePicker.platform.pickFiles(
-      type             : FileType.custom,
+    final result = await FilePicker.pickFiles(
+      type: FileType.custom,
       allowedExtensions: ['txt'],
       withData         : true,
     );
@@ -54,7 +54,7 @@ class TextImportService {
   ///   - 1-column CSV: just the target language text per row (rows become paragraphs)
   ///   - 2-column CSV: column 1 = target language, column 2 = English translation
   Future<ImportResult?> importCsv() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type             : FileType.custom,
       allowedExtensions: ['csv'],
       withData         : true,
@@ -66,7 +66,10 @@ class TextImportService {
     if (bytes == null) return null;
 
     final csvString = utf8.decode(bytes, allowMalformed: true);
-    final rows      = const CsvToListConverter(eol: '\n').convert(csvString);
+    // csv v8: use Csv().decode() � CsvToListConverter is still present but
+    // the canonical API is now the Csv codec. Auto-detection handles both
+    // comma and semicolon delimiters and \n / \r\n line endings.
+    final rows = Csv(lineDelimiter: '\n').decode(csvString);
 
     final targetParagraphs  = <String>[];
     final englishParagraphs = <String>[];

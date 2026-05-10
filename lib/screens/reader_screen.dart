@@ -205,11 +205,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
       final isTracked  = trackedSet.contains(key);
 
       final bgColor = isSelected
-          ? AppTheme.accent.withOpacity(0.3)
+          ? AppTheme.accent.withValues(alpha: 0.3)
           : isLearned
-              ? AppTheme.success.withOpacity(0.15)
+              ? AppTheme.success.withValues(alpha: 0.15)
               : isTracked
-                  ? AppTheme.warning.withOpacity(0.15)
+                  ? AppTheme.warning.withValues(alpha: 0.15)
                   : null;
 
       final fgColor = isSelected
@@ -287,7 +287,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
           decoration: BoxDecoration(
             color       : AppTheme.cardBg,
             borderRadius: BorderRadius.circular(16),
-            border      : Border.all(color: AppTheme.accent.withOpacity(0.4)),
+            border      : Border.all(color: AppTheme.accent.withValues(alpha: 0.4)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -301,8 +301,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
                     Chip(
                       label: Text(existing.learned ? '✓ Learned' : '📚 Studying'),
                       backgroundColor: existing.learned
-                          ? AppTheme.success.withOpacity(0.2)
-                          : AppTheme.warning.withOpacity(0.2),
+                          ? AppTheme.success.withValues(alpha: 0.2)
+                          : AppTheme.warning.withValues(alpha: 0.2),
                     ),
                 ],
               ),

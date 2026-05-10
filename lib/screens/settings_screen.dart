@@ -57,7 +57,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       decoration: BoxDecoration(
         color: AppTheme.cardBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.error.withOpacity(0.35)),
+        border: Border.all(color: AppTheme.error.withValues(alpha: 0.35)),
       ),
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -68,7 +68,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Container(
                 width: 40, height: 40,
                 decoration: BoxDecoration(
-                  color: AppTheme.error.withOpacity(0.15),
+                  color: AppTheme.error.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(Icons.restore, color: AppTheme.error, size: 22),

@@ -217,7 +217,7 @@ class _WordTile extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: entry.learned
-                      ? AppTheme.success.withOpacity(0.2)
+                      ? AppTheme.success.withValues(alpha: 0.2)
                       : AppTheme.surfaceLight,
                   border: Border.all(
                     color: entry.learned ? AppTheme.success : AppTheme.divider,

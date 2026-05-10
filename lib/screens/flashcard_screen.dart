@@ -121,7 +121,7 @@ class _FlashcardScreenState extends State<FlashcardScreen>
                 ),
               ),
               back: _CardFace(
-                color: AppTheme.accent.withOpacity(0.08),
+                color: AppTheme.accent.withValues(alpha: 0.08),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -318,7 +318,7 @@ class _CardFace extends StatelessWidget {
         border: Border.all(color: AppTheme.divider, width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.3),
+            color: Colors.black.withValues(alpha: 0.3),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -346,9 +346,9 @@ class _ActionButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.15),
+          color: color.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: color.withOpacity(0.4)),
+          border: Border.all(color: color.withValues(alpha: 0.4)),
         ),
         child: Column(
           children: [

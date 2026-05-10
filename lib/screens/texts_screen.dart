@@ -187,7 +187,7 @@ class _TextCard extends StatelessWidget {
         leading: Container(
           width: 44, height: 44,
           decoration: BoxDecoration(
-            color: AppTheme.accent.withOpacity(0.15),
+            color: AppTheme.accent.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(_sourceIcon, color: AppTheme.accentLight, size: 22),
@@ -250,7 +250,7 @@ class _ImportSheetState extends State<_ImportSheet> {
               padding: const EdgeInsets.all(12),
               margin: const EdgeInsets.only(bottom: 12),
               decoration: BoxDecoration(
-                color: AppTheme.error.withOpacity(0.15),
+                color: AppTheme.error.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(_error!, style: const TextStyle(color: AppTheme.error)),
