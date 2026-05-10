@@ -20,7 +20,7 @@ dependencies:
   path_provider: ^2.1.1
 
   # File picking
-  file_picker: ^6.1.1
+  file_picker: ^11.0.2
 
   # HTTP for downloading web pages
   http: ^1.1.0
@@ -29,22 +29,22 @@ dependencies:
   html: ^0.15.4
 
   # CSV parsing
-  csv: ^5.1.1
+  csv: ^8.0.0
 
   # Shared preferences for settings
   shared_preferences: ^2.2.2
 
   # UI extras
   cupertino_icons: ^1.0.6
-  google_fonts: ^6.1.0
+  google_fonts: ^8.1.0
   flip_card: ^0.7.0
-  lottie: ^2.7.0
+  lottie: ^3.3.3
   url_launcher: ^6.2.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.1
+  flutter_lints: ^6.0.0
 
 flutter:
   uses-material-design: true
