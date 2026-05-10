@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/language.dart';
 import '../providers/app_provider.dart';
 import '../theme.dart';
+import 'settings_screen.dart';
 import 'texts_screen.dart';
 import 'vocabulary_screen.dart';
 
@@ -29,6 +30,14 @@ class HomeScreen extends StatelessWidget {
                 icon     : const Icon(Icons.add),
                 tooltip  : 'Add language',
                 onPressed: () => _showAddLanguageDialog(context, provider),
+              ),
+              IconButton(
+                icon: const Icon(Icons.settings_outlined),
+                tooltip: 'Settings',
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                ),
               ),
             ],
           ),

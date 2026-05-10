@@ -90,22 +90,53 @@ class DatabaseService {
       )
     ''');
 
-    // Seed common languages
+    await _seedLanguages(db);
+  }
+
+  // ── Seed data ──────────────────────────────────────────────
+  static const _defaultLanguages = [
+    {'name': 'Arabic',             'code': 'ar', 'flag_emoji': '🇸🇦'},
+    {'name': 'Chinese (Simplified)','code': 'zh', 'flag_emoji': '🇨🇳'},
+    {'name': 'French',             'code': 'fr', 'flag_emoji': '🇫🇷'},
+    {'name': 'German',             'code': 'de', 'flag_emoji': '🇩🇪'},
+    {'name': 'Italian',            'code': 'it', 'flag_emoji': '🇮🇹'},
+    {'name': 'Japanese',           'code': 'ja', 'flag_emoji': '🇯🇵'},
+    {'name': 'Korean',             'code': 'ko', 'flag_emoji': '🇰🇷'},
+    {'name': 'Portuguese',         'code': 'pt', 'flag_emoji': '🇧🇷'},
+    {'name': 'Russian',            'code': 'ru', 'flag_emoji': '🇷🇺'},
+    {'name': 'Spanish',            'code': 'es', 'flag_emoji': '🇪🇸'},
+  ];
+
+  Future<void> _seedLanguages(Database db) async {
     final now = DateTime.now().toIso8601String();
-    final langs = [
-      {'name': 'Spanish',              'code': 'es', 'flag_emoji': '🇪🇸'},
-      {'name': 'Japanese',             'code': 'ja', 'flag_emoji': '🇯🇵'},
-      {'name': 'French',               'code': 'fr', 'flag_emoji': '🇫🇷'},
-      {'name': 'German',               'code': 'de', 'flag_emoji': '🇩🇪'},
-      {'name': 'Italian',              'code': 'it', 'flag_emoji': '🇮🇹'},
-      {'name': 'Portuguese',           'code': 'pt', 'flag_emoji': '🇧🇷'},
-      {'name': 'Chinese (Simplified)', 'code': 'zh', 'flag_emoji': '🇨🇳'},
-      {'name': 'Korean',               'code': 'ko', 'flag_emoji': '🇰🇷'},
-      {'name': 'Russian',              'code': 'ru', 'flag_emoji': '🇷🇺'},
-    ];
-    for (final lang in langs) {
+    for (final lang in _defaultLanguages) {
       await db.insert('languages', {...lang, 'created_at': now});
     }
+  }
+
+  // ── Factory reset ──────────────────────────────────────────
+  /// Wipes all user data and restores the default language list.
+  /// Runs inside a single transaction for atomicity.
+  Future<void> factoryReset() async {
+    final db = await database;
+    await db.transaction((txn) async {
+      // Delete all user data. CASCADE handles paragraphs and word_entries
+      // that reference languages / study_texts, but we delete explicitly
+      // in dependency order to be safe with any SQLite PRAGMA settings.
+      await txn.delete('word_entries');
+      await txn.delete('paragraphs');
+      await txn.delete('study_texts');
+      await txn.delete('languages');
+
+      // Reset the AUTOINCREMENT counters so IDs start from 1 again.
+      await txn.delete('sqlite_sequence');
+
+      // Re-seed the default language list.
+      final now = DateTime.now().toIso8601String();
+      for (final lang in _defaultLanguages) {
+        await txn.insert('languages', {...lang, 'created_at': now});
+      }
+    });
   }
 
   // ── Languages ──────────────────────────────────────────────

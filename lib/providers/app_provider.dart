@@ -72,8 +72,25 @@ class AppProvider extends ChangeNotifier {
 
   Future<void> addLanguage(String name, String code, String? flag) async {
     final lang = Language(name: name, code: code, flagEmoji: flag);
-    final id = await _db.insertLanguage(lang);
+    await _db.insertLanguage(lang);
     _languages = await _db.getLanguages();
+    notifyListeners();
+  }
+
+  /// Wipes all data and re-seeds the default language list.
+  Future<void> factoryReset() async {
+    await _db.factoryReset();
+    // Reset all in-memory state
+    _languages = await _db.getLanguages();
+    _selectedLanguage = null;
+    _texts = [];
+    _selectedText = null;
+    _paragraphs = [];
+    _selectedParagraphIndex = 0;
+    _words = [];
+    _flashcardQueue = [];
+    _stats = {};
+    _error = null;
     notifyListeners();
   }
 
