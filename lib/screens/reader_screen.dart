@@ -109,9 +109,16 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   Widget _buildParagraphView(BuildContext context, AppProvider provider,
       Map<String, dynamic> para, bool hasEnglish) {
-    final targetText  = para['content'] as String;
-    final englishText = para['english_content'] as String?;
-    final showEN      = hasEnglish && _showTranslation && englishText != null;
+    // sqflite returns values as Object? — use toString() to safely extract,
+    // falling back to an empty string if the value is null.
+    final targetText = (para['content'] ?? '').toString();
+    final englishRaw = para['english_content'];
+    final englishText = englishRaw != null ? englishRaw.toString() : null;
+    final showEN = hasEnglish && _showTranslation && englishText != null && englishText.isNotEmpty;
+
+    if (targetText.isEmpty) {
+      return const Center(child: Text('(empty paragraph)'));
+    }
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),

@@ -82,6 +82,7 @@ class AppProvider extends ChangeNotifier {
     await _db.insertStudyText(text);
     if (_selectedLanguage != null) {
       _texts = await _db.getTextsForLanguage(_selectedLanguage!.id!);
+      _words = await _db.getWordsForLanguage(_selectedLanguage!.id!);
       _stats = await _db.getStats(_selectedLanguage!.id!);
     }
     notifyListeners();
@@ -103,7 +104,28 @@ class AppProvider extends ChangeNotifier {
   Future<void> selectText(StudyText text) async {
     _selectedText = text;
     _selectedParagraphIndex = 0;
-    _paragraphs = await _db.getParagraphs(text.id!);
+    _paragraphs = [];
+    notifyListeners(); // clear stale paragraph immediately
+
+    final rows = await _db.getParagraphs(text.id!);
+    // Ensure every row is a proper mutable Map<String, dynamic> with String content.
+    _paragraphs = rows.map((row) {
+      return <String, dynamic>{
+        'id': row['id'],
+        'text_id': row['text_id'],
+        'content': (row['content'] ?? '').toString(),
+        'english_content': row['english_content'] != null
+            ? row['english_content'].toString()
+            : null,
+        'position': row['position'],
+      };
+    }).toList();
+
+    // Also refresh words so colour coding is up to date for this text.
+    if (_selectedLanguage != null) {
+      _words = await _db.getWordsForLanguage(_selectedLanguage!.id!);
+    }
+
     notifyListeners();
   }
 
