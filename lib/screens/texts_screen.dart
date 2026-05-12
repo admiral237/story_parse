@@ -123,8 +123,8 @@ class TextsScreen extends StatelessWidget {
           text: text,
           onTap: () async {
             await provider.selectText(text);
-            if (ctx.mounted) {
-              Navigator.push(ctx, MaterialPageRoute(
+            if (context.mounted) {
+              Navigator.push(context, MaterialPageRoute(
                 builder: (_) => const ReaderScreen(),
               ));
             }

@@ -74,12 +74,12 @@ class _ReaderScreenState extends State<ReaderScreen> {
       BuildContext context, AppProvider provider,
       List<Map<String, dynamic>> paras, int idx) {
     return Container(
-      height: 50,
+      height : 50,
       padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: ListView.builder(
+      child  : ListView.builder(
         scrollDirection: Axis.horizontal,
-        itemCount: paras.length,
-        itemBuilder: (ctx, i) {
+        itemCount      : paras.length,
+        itemBuilder    : (ctx, i) {
           final selected = i == idx;
           return GestureDetector(
             onTap: () => provider.selectParagraph(i),
@@ -111,10 +111,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
       Map<String, dynamic> para, bool hasEnglish) {
     // sqflite returns values as Object? — use toString() to safely extract,
     // falling back to an empty string if the value is null.
-    final targetText = (para['content'] ?? '').toString();
-    final englishRaw = para['english_content'];
+    final targetText  = (para['content'] ?? '').toString();
+    final englishRaw  = para['english_content'];
     final englishText = englishRaw != null ? englishRaw.toString() : null;
-    final showEN = hasEnglish && _showTranslation && englishText != null && englishText.isNotEmpty;
+    final showEN      = hasEnglish && _showTranslation && englishText != null && englishText.isNotEmpty;
 
     if (targetText.isEmpty) {
       return const Center(child: Text('(empty paragraph)'));
@@ -220,8 +220,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
       spans.add(WidgetSpan(
         alignment: PlaceholderAlignment.baseline,
-        baseline : TextBaseline.alphabetic,
-        child    : GestureDetector(
+        baseline: TextBaseline.alphabetic,
+        child: GestureDetector(
           onTap: () => setState(() {
             _selectedWord = isSelected ? null : key;
           }),
@@ -362,27 +362,30 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   Widget _buildNavBar(BuildContext context, AppProvider provider, int idx, int total) {
-    return Container(
-      padding   : const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-      decoration: const BoxDecoration(
-        color : AppTheme.cardBg,
-        border: Border(top: BorderSide(color: AppTheme.divider)),
-      ),
-      child: Row(
-        children: [
-          IconButton(
-            icon     : const Icon(Icons.arrow_back_ios),
-            onPressed: idx > 0 ? () => provider.selectParagraph(idx - 1): null,
-          ),
-          Expanded(child: Center(child: Text(
-            'Paragraph ${idx + 1} of $total',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ))),
-          IconButton(
-            icon     : const Icon(Icons.arrow_forward_ios),
-            onPressed: idx < total - 1 ? () => provider.selectParagraph(idx + 1) : null,
-          ),
-        ],
+    return SafeArea(
+      child: Container(
+        height: 64,
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        decoration: const BoxDecoration(
+          color: AppTheme.cardBg,
+          border: Border(top: BorderSide(color: AppTheme.divider)),
+        ),
+        child: Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.arrow_back_ios),
+              onPressed: idx > 0 ? () => provider.selectParagraph(idx - 1) : null,
+            ),
+            Expanded(child: Center(child: Text(
+              'Paragraph ${idx + 1} of $total',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ))),
+            IconButton(
+              icon: const Icon(Icons.arrow_forward_ios),
+              onPressed: idx < total - 1 ? () => provider.selectParagraph(idx + 1) : null,
+            ),
+          ],
+        ),
       ),
     );
   }
