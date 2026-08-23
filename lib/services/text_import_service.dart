@@ -66,7 +66,7 @@ class TextImportService {
     if (bytes == null) return null;
 
     final csvString = utf8.decode(bytes, allowMalformed: true);
-    // csv v8: use Csv().decode() � CsvToListConverter is still present but
+    // csv v8: use Csv().decode() — CsvToListConverter is still present but
     // the canonical API is now the Csv codec. Auto-detection handles both
     // comma and semicolon delimiters and \n / \r\n line endings.
     final rows = Csv(lineDelimiter: '\n').decode(csvString);

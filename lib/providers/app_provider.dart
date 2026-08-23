@@ -1,8 +1,11 @@
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
+import '../models/dictionary_entry.dart';
 import '../models/language.dart';
 import '../models/study_text.dart';
 import '../models/word_entry.dart';
 import '../services/database_service.dart';
+import '../services/dictionary_import_service.dart';
 
 class AppProvider extends ChangeNotifier {
   final DatabaseService _db = DatabaseService();
@@ -221,6 +224,70 @@ class AppProvider extends ChangeNotifier {
 
   void clearError() {
     _error = null;
+    notifyListeners();
+  }
+
+  // ── Dictionary import ──────────────────────────────────────
+  int _dictImportLines = 0;
+  int _dictImportMatched = 0;
+  bool _dictImporting = false;
+
+  int get dictImportLines => _dictImportLines;
+  int get dictImportMatched => _dictImportMatched;
+  bool get dictImporting => _dictImporting;
+
+  /// Stream-import a Kaikki JSONL file for [languageId]/[langCode].
+  /// Progress is broadcast via [dictImportLines] / [dictImportMatched].
+  Future<void> importDictionary({
+    required String filePath,
+    Uint8List? fileBytes,
+    required String langCode,
+  }) async {
+    if (_selectedLanguage == null) return;
+    final langId = _selectedLanguage!.id!;
+
+    _dictImporting = true;
+    _dictImportLines = 0;
+    _dictImportMatched = 0;
+    notifyListeners();
+
+    try {
+      final service = DictionaryImportService();
+      final stream = service.parseBatched(
+        targetLangCode: langCode,
+        filePath: filePath,
+        fileBytes: fileBytes,
+        onProgress: (lines, matched) {
+          _dictImportLines = lines;
+          _dictImportMatched = matched;
+          notifyListeners();
+        },
+      );
+
+      await for (final batch in stream) {
+        await _db.insertDictionaryBatch(langId, batch);
+      }
+
+      // Refresh stats to show updated dict_words count.
+      _stats = await _db.getStats(langId);
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      _dictImporting = false;
+      notifyListeners();
+    }
+  }
+
+  /// Look up [word] in the dictionary for the currently selected language.
+  Future<List<DictionaryEntry>> lookupWord(String word) async {
+    if (_selectedLanguage == null) return [];
+    return _db.lookupWord(_selectedLanguage!.id!, word);
+  }
+
+  Future<void> clearDictionary() async {
+    if (_selectedLanguage == null) return;
+    await _db.clearDictionary(_selectedLanguage!.id!);
+    _stats = await _db.getStats(_selectedLanguage!.id!);
     notifyListeners();
   }
 }

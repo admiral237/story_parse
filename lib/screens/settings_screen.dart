@@ -143,6 +143,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           '  • All imported texts\n'
           '  • All paragraphs\n'
           '  • All vocabulary words and progress\n'
+          '  • All dictionary entries\n'
           '  • All custom languages\n\n'
           'The default 10 languages will be restored.\n\n'
           'Are you sure? This cannot be undone.',

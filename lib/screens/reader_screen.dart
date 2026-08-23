@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import '../models/dictionary_entry.dart';
 import '../models/word_entry.dart';
 import '../providers/app_provider.dart';
+import '../services/dictionary_import_service.dart';
 import '../theme.dart';
 import 'flashcard_screen.dart';
 
@@ -269,93 +271,14 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   Widget _buildWordPanel(BuildContext context, AppProvider provider, String word) {
-    // Words are auto-extracted on import, so they will almost always be in the DB.
-    final existing = provider.words.firstWhere(
-      (w) => w.word.toLowerCase() == word.toLowerCase(),
-      orElse: () => WordEntry(languageId: -1, word: word),
-    );
-    final isTracked = existing.languageId != -1;
-
-    // Use StatefulBuilder so the controllers don't rebuild on every parent setState.
-    return StatefulBuilder(
-      builder: (ctx, setInner) {
-        final readingCtrl = TextEditingController(text: existing.reading ?? '');
-        final defCtrl = TextEditingController(text: existing.definition ?? '');
-
-        return Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color       : AppTheme.cardBg,
-            borderRadius: BorderRadius.circular(16),
-            border      : Border.all(color: AppTheme.accent.withValues(alpha: 0.4)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(child: Text(word,
-                    style: Theme.of(context).textTheme.headlineMedium,
-                  )),
-                  if (isTracked)
-                    Chip(
-                      label: Text(existing.learned ? '✓ Learned' : '📚 Studying'),
-                      backgroundColor: existing.learned
-                          ? AppTheme.success.withValues(alpha: 0.2)
-                          : AppTheme.warning.withValues(alpha: 0.2),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: readingCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Reading / Pronunciation',
-                  hintText : 'e.g. furigana, IPA...',
-                  isDense  : true,
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: defCtrl,
-                maxLines: 2,
-                decoration: const InputDecoration(
-                  labelText: 'Definition / Translation',
-                  hintText : 'Add your notes...',
-                  isDense  : true,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Row(children: [
-                Expanded(child: ElevatedButton(
-                  onPressed: () async {
-                    await provider.addWord(
-                      word      : word.toLowerCase(),
-                      reading   : readingCtrl.text.trim().isEmpty ? null: readingCtrl.text.trim(),
-                      definition: defCtrl.text.trim().isEmpty ? null    : defCtrl.text.trim(),
-                    );
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('"$word" saved')),
-                      );
-                      setState(() {}); // refresh colour in text
-                    }
-                  },
-                  child: Text(isTracked ? 'Save Notes' : 'Track Word'),
-                )),
-                if (isTracked) ...[
-                  const SizedBox(width: 10),
-                  OutlinedButton(
-                    onPressed: () async {
-                      await provider.markWordLearned(existing, !existing.learned);
-                      if (mounted) setState(() {});
-                    },
-                    child: Text(existing.learned ? 'Unlearn' : 'Mark Learned'),
-                  ),
-                ],
-              ]),
-            ],
-          ),
+    return FutureBuilder(
+      future: provider.lookupWord(word),
+      builder: (context, snapshot) {
+        final dictEntries = snapshot.data ?? [];
+        return _WordPanelContent(
+          word: word,
+          provider: provider,
+          dictEntries: dictEntries,
         );
       },
     );
@@ -406,5 +329,237 @@ class _ReaderScreenState extends State<ReaderScreen> {
     Navigator.push(context, MaterialPageRoute(
       builder: (_) => const FlashcardScreen(),
     ));
+  }
+}
+
+// ── Word panel ─────────────────────────────────────────────────────────────────
+
+class _WordPanelContent extends StatefulWidget {
+  final String word;
+  final AppProvider provider;
+  final List<DictionaryEntry> dictEntries;
+
+  const _WordPanelContent({
+    required this.word,
+    required this.provider,
+    required this.dictEntries,
+  });
+
+  @override
+  State<_WordPanelContent> createState() => _WordPanelContentState();
+}
+
+class _WordPanelContentState extends State<_WordPanelContent> {
+  late TextEditingController _readingCtrl;
+  late TextEditingController _defCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _initControllers();
+  }
+
+  @override
+  void didUpdateWidget(_WordPanelContent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.word != widget.word || oldWidget.dictEntries != widget.dictEntries) {
+      _readingCtrl.dispose();
+      _defCtrl.dispose();
+      _initControllers();
+    }
+  }
+
+  void _initControllers() {
+    final existing = _existingEntry;
+    _readingCtrl = TextEditingController(text: existing?.reading ?? '');
+    _defCtrl = TextEditingController(text: existing?.definition ?? _suggestedDef ?? '');
+  }
+
+  @override
+  void dispose() {
+    _readingCtrl.dispose();
+    _defCtrl.dispose();
+    super.dispose();
+  }
+
+  WordEntry? get _existingEntry {
+    try {
+      return widget.provider.words.firstWhere(
+        (w) => w.word.toLowerCase() == widget.word.toLowerCase(),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// First gloss from the dictionary, used to pre-fill the definition field.
+  String? get _suggestedDef {
+    if (widget.dictEntries.isEmpty) return null;
+    return DictionaryImportService.firstGloss(widget.dictEntries.first.sensesJson);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final existing = _existingEntry;
+    final isTracked = existing != null;
+    final hasDictEntries = widget.dictEntries.isNotEmpty;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.accent.withValues(alpha: 0.4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header row: word + learned chip
+          Row(children: [
+            Expanded(
+              child: Text(widget.word,
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+            ),
+            if (isTracked)
+              Chip(
+                label: Text(existing.learned ? '✓ Learned' : '📚 Studying'),
+                backgroundColor: existing.learned
+                    ? AppTheme.success.withValues(alpha: 0.2)
+                    : AppTheme.warning.withValues(alpha: 0.2),
+              ),
+          ]),
+
+          // Dictionary entries (auto-lookup)
+          if (hasDictEntries) ...[
+            const SizedBox(height: 12),
+            _buildDictSection(context),
+          ],
+
+          const SizedBox(height: 12),
+          TextField(
+            controller: _readingCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Reading / Pronunciation',
+              hintText: 'e.g. furigana, IPA…',
+              isDense: true,
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _defCtrl,
+            maxLines: 2,
+            decoration: const InputDecoration(
+              labelText: 'My Notes / Definition',
+              hintText: 'Add your own notes…',
+              isDense: true,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(children: [
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () async {
+                  await widget.provider.addWord(
+                    word: widget.word.toLowerCase(),
+                    reading: _readingCtrl.text.trim().isEmpty
+                        ? null : _readingCtrl.text.trim(),
+                    definition: _defCtrl.text.trim().isEmpty
+                        ? null : _defCtrl.text.trim(),
+                  );
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('"${widget.word}" saved')),
+                    );
+                    setState(() {});
+                  }
+                },
+                child: Text(isTracked ? 'Save Notes' : 'Track Word'),
+              ),
+            ),
+            if (isTracked) ...[
+              const SizedBox(width: 10),
+              OutlinedButton(
+                onPressed: () async {
+                  await widget.provider.markWordLearned(existing, !existing.learned);
+                  if (mounted) setState(() {});
+                },
+                child: Text(existing.learned ? 'Unlearn' : 'Mark Learned'),
+              ),
+            ],
+          ]),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDictSection(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppTheme.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            const Icon(Icons.library_books_outlined,
+                size: 14, color: AppTheme.accentLight),
+            const SizedBox(width: 6),
+            Text('Dictionary',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: AppTheme.accentLight, fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
+            ),
+          ]),
+          const SizedBox(height: 8),
+          ...widget.dictEntries.map((entry) => _buildDictEntry(context, entry)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDictEntry(BuildContext context, DictionaryEntry entry) {
+    final glosses = DictionaryImportService.allGlosses(entry.sensesJson);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (entry.pos != null)
+            Text(entry.pos!.toUpperCase(),
+              style: GoogleFonts.dmSans(
+                fontSize: 10, color: AppTheme.textSecondary,
+                letterSpacing: 0.8, fontWeight: FontWeight.w600,
+              ),
+            ),
+          ...glosses.take(3).map((g) => Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('• ', style: TextStyle(color: AppTheme.accent, fontSize: 14)),
+                Expanded(
+                  child: Text(g,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )),
+          if (glosses.length > 3)
+            Text('+ ${glosses.length - 3} more senses',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                fontSize: 11, color: AppTheme.textSecondary,
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }

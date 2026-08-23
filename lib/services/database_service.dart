@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
@@ -7,6 +8,8 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import '../models/language.dart';
 import '../models/study_text.dart';
 import '../models/word_entry.dart';
+import '../models/dictionary_entry.dart';
+import '../services/dictionary_import_service.dart';
 
 class DatabaseService {
   static final DatabaseService _instance = DatabaseService._internal();
@@ -32,8 +35,9 @@ class DatabaseService {
 
     return openDatabase(
       dbPath,
-      version : 1,
+      version: 2,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -90,7 +94,35 @@ class DatabaseService {
       )
     ''');
 
+    await _createDictionaryTable(db);
     await _seedLanguages(db);
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await _createDictionaryTable(db);
+    }
+  }
+
+  Future<void> _createDictionaryTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS dictionary_entries (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        language_id INTEGER NOT NULL,
+        word        TEXT    NOT NULL,
+        lang_code   TEXT    NOT NULL,
+        pos         TEXT,
+        senses_json TEXT,
+        forms_json  TEXT,
+        sounds_json TEXT,
+        FOREIGN KEY (language_id) REFERENCES languages (id) ON DELETE CASCADE
+      )
+    ''');
+    // Index on (language_id, word) for fast lookups from the reader.
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_dict_lang_word
+        ON dictionary_entries (language_id, word)
+    ''');
   }
 
   // ── Seed data ──────────────────────────────────────────────
@@ -126,6 +158,7 @@ class DatabaseService {
       await txn.delete('word_entries');
       await txn.delete('paragraphs');
       await txn.delete('study_texts');
+      await txn.delete('dictionary_entries');
       await txn.delete('languages');
 
       // Reset the AUTOINCREMENT counters so IDs start from 1 again.
@@ -137,6 +170,65 @@ class DatabaseService {
         await txn.insert('languages', {...lang, 'created_at': now});
       }
     });
+  }
+
+  // ── Dictionary ─────────────────────────────────────────────
+
+  /// Bulk-insert a batch of parsed entries.  Uses INSERT OR IGNORE so
+  /// re-importing the same file is safe (duplicates are skipped).
+  Future<void> insertDictionaryBatch(
+      int languageId, List<ParsedDictionaryEntry> entries) async {
+    final db = await database;
+    final batch = db.batch();
+    for (final e in entries) {
+      batch.rawInsert('''
+        INSERT OR IGNORE INTO dictionary_entries
+          (language_id, word, lang_code, pos, senses_json, forms_json, sounds_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      ''', [
+        languageId,
+        e.word,
+        e.langCode,
+        e.pos,
+        e.sensesJson,
+        e.formsJson,
+        e.soundsJson,
+      ]);
+    }
+    await batch.commit(noResult: true);
+  }
+
+  /// Look up all dictionary entries for [word] in [languageId].
+  /// Returns multiple rows when a word has several parts-of-speech.
+  Future<List<DictionaryEntry>> lookupWord(int languageId, String word) async {
+    final db = await database;
+    final rows = await db.query(
+      'dictionary_entries',
+      where: 'language_id = ? AND word = ?',
+      whereArgs: [languageId, word.toLowerCase()],
+    );
+    if (rows.isNotEmpty) return rows.map(DictionaryEntry.fromMap).toList();
+
+    // Try case-insensitive fallback (LIKE is case-insensitive for ASCII in SQLite).
+    final fallback = await db.rawQuery(
+      'SELECT * FROM dictionary_entries WHERE language_id = ? AND word LIKE ?',
+      [languageId, word],
+    );
+    return fallback.map(DictionaryEntry.fromMap).toList();
+  }
+
+  Future<int> getDictionaryCount(int languageId) async {
+    final db = await database;
+    return Sqflite.firstIntValue(await db.rawQuery(
+      'SELECT COUNT(*) FROM dictionary_entries WHERE language_id = ?',
+      [languageId],
+    )) ?? 0;
+  }
+
+  Future<void> clearDictionary(int languageId) async {
+    final db = await database;
+    await db.delete('dictionary_entries',
+        where: 'language_id = ?', whereArgs: [languageId]);
   }
 
   // ── Languages ──────────────────────────────────────────────
@@ -362,6 +454,13 @@ class DatabaseService {
         'SELECT COUNT(*) FROM word_entries WHERE language_id = ? AND learned = 1', [languageId])) ?? 0;
     final texts = Sqflite.firstIntValue(await db.rawQuery(
         'SELECT COUNT(*) FROM study_texts WHERE language_id = ?', [languageId])) ?? 0;
-    return {'total_words': total, 'learned_words': learned, 'texts': texts};
+    final dictWords = Sqflite.firstIntValue(await db.rawQuery(
+        'SELECT COUNT(*) FROM dictionary_entries WHERE language_id = ?', [languageId])) ?? 0;
+    return {
+      'total_words': total,
+      'learned_words': learned,
+      'texts': texts,
+      'dict_words': dictWords,
+    };
   }
 }

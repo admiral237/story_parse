@@ -5,6 +5,7 @@ import '../providers/app_provider.dart';
 import '../services/database_service.dart';
 import '../services/text_import_service.dart';
 import '../theme.dart';
+import 'dictionary_screen.dart';
 import 'reader_screen.dart';
 import 'vocabulary_screen.dart';
 import 'flashcard_screen.dart';
@@ -26,6 +27,13 @@ class TextsScreen extends StatelessWidget {
             ),
             title: Text('${lang?.flagEmoji ?? ''} ${lang?.name ?? ''} — Texts'),
             actions: [
+              IconButton(
+                icon: const Icon(Icons.library_books_outlined),
+                tooltip: 'Dictionary',
+                onPressed: () => Navigator.push(context, MaterialPageRoute(
+                  builder: (_) => const DictionaryScreen(),
+                )),
+              ),
               IconButton(
                 icon: const Icon(Icons.style_outlined),
                 tooltip: 'Flashcards',
@@ -71,6 +79,7 @@ class TextsScreen extends StatelessWidget {
 
   Widget _buildStats(BuildContext context, AppProvider provider) {
     final s = provider.stats;
+    final dictCount = s['dict_words'] ?? 0;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
@@ -80,9 +89,19 @@ class TextsScreen extends StatelessWidget {
           _stat(context, '${s['total_words'] ?? 0}', 'Words tracked'),
           const SizedBox(width: 24),
           _stat(context, '${s['learned_words'] ?? 0}', 'Learned'),
+          if (dictCount > 0) ...[
+            const SizedBox(width: 24),
+            _stat(context, _fmtK(dictCount), 'Dict entries'),
+          ],
         ],
       ),
     );
+  }
+
+  String _fmtK(int n) {
+    if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(1)}M';
+    if (n >= 1000) return '${(n / 1000).toStringAsFixed(0)}K';
+    return '$n';
   }
 
   Widget _stat(BuildContext context, String value, String label) {
